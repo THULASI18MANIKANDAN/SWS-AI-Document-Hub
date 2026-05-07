@@ -1,0 +1,42 @@
+/* Custom CSS additions to complement Tailwind */
+
+body {
+    font-family: 'Livvic', sans-serif;
+}
+
+.upload-zone {
+    border: 2px dashed #cbd5e1;
+    transition: all 0.3s ease;
+}
+
+.upload-zone.dragover {
+    border-color: #2563eb;
+    background-color: #eff6ff;
+}
+
+/* Custom scrollbar for dropdowns */
+::-webkit-scrollbar {
+    width: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    border-radius: 10px;
+}
+
+.toast-enter {
+    animation: slideIn 0.3s forwards;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
