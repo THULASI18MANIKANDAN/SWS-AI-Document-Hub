@@ -30,10 +30,17 @@ A full-stack Document Management Dashboard built for the SWS AI assessment.
 
 *(The frontend is statically served from the `frontend` folder directly by FastAPI).*
 
-## Connecting to GitHub (Manual Instructions)
-Since `git` is not installed on this specific machine, you can upload this code to your GitHub repository by doing the following:
+## Upload Architecture & Notifications
+*(Updated: 2026-05-07T13:37:38+05:30)*
 
-1. Open your GitHub Repository: `https://github.com/THULASI18MANIKANDAN/SWS-AI-Document-Hub`
-2. Click **Add file** > **Upload files**.
-3. Drag and drop the `backend` and `frontend` folders from `c:\Users\Student.LIS-22\Downloads\SWS document hub` into the upload area on GitHub.
-4. Click **Commit changes**.
+- **Single/Small Uploads (<=3 files):** Processed synchronously. The frontend displays per-file simulated progress bars, and the backend handles each file immediately.
+- **Bulk Uploads (>3 files):** Triggers asynchronous background processing in FastAPI.
+- **SSE Notifications:** Upon completion of a bulk upload background task, a notification is saved to the SQLite database and pushed to an `asyncio.Queue`. The frontend receives this via the `EventSource` API and displays a real-time toast notification.
+
+## GitHub Information
+This repository is configured to push to GitHub. You can commit and push changes directly from the command line using:
+```cmd
+git add .
+git commit -m "Update"
+git push
+```
