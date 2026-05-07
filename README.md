@@ -1,6 +1,5 @@
 # SWS AI Document Hub
 
-A full-stack Document Management Dashboard built for the SWS AI assessment.
 
 ## Features
 1. **Single & Bulk Uploads**: Drag and drop PDFs with per-file progress bars.
@@ -9,7 +8,7 @@ A full-stack Document Management Dashboard built for the SWS AI assessment.
 
 ## Tech Stack
 - **Frontend**: React, TailwindCSS, Babel (via CDN for a fast, no-build setup).
-- **Backend**: Python 3.7+, FastAPI, SQLite.
+- **Backend**:FastAPI, SQLite.
 
 ## How to Run
 
@@ -28,12 +27,5 @@ A full-stack Document Management Dashboard built for the SWS AI assessment.
 4. Open your browser and go to:
    [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
 
-*(The frontend is statically served from the `frontend` folder directly by FastAPI).*
 
-## Connecting to GitHub (Manual Instructions)
-Since `git` is not installed on this specific machine, you can upload this code to your GitHub repository by doing the following:
 
-1. Open your GitHub Repository: `https://github.com/THULASI18MANIKANDAN/SWS-AI-Document-Hub`
-2. Click **Add file** > **Upload files**.
-3. Drag and drop the `backend` and `frontend` folders from `c:\Users\Student.LIS-22\Downloads\SWS document hub` into the upload area on GitHub.
-4. Click **Commit changes**.
