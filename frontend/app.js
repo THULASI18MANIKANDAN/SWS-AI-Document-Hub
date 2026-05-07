@@ -94,7 +94,7 @@ function App() {
         status: 'uploading'
       }));
 
-      setUploadingFiles(prev => [...newUploads, ...prev]);
+      setUploadingFiles(newUploads);
 
       // Process each file with simulated progress
       newUploads.forEach(async (uploadObj) => {
@@ -235,7 +235,10 @@ function App() {
               multiple 
               className="hidden" 
               ref={fileInputRef}
-              onChange={(e) => handleFiles(Array.from(e.target.files))}
+              onChange={(e) => {
+                handleFiles(Array.from(e.target.files));
+                e.target.value = null;
+              }}
               accept="application/pdf"
             />
             <div className="bg-blue-50 text-brand-blue p-4 rounded-full mb-4">
@@ -246,7 +249,6 @@ function App() {
             <div className="flex gap-3">
               <span className="px-4 py-1.5 bg-gray-100 text-gray-600 rounded-full text-sm font-medium">Single file</span>
               <span className="px-4 py-1.5 bg-gray-100 text-gray-600 rounded-full text-sm font-medium">Bulk upload</span>
-              <span className="px-4 py-1.5 bg-blue-100 text-brand-blue rounded-full text-sm font-medium">Try 4+ files to trigger notifications</span>
             </div>
           </div>
         </section>

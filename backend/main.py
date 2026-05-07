@@ -2,7 +2,7 @@ import asyncio
 import os
 import uuid
 import datetime
-from fastapi import FastAPI, File, UploadFile, Depends, BackgroundTasks, HTTPException
+from fastapi import FastAPI, File, UploadFile, Depends, BackgroundTasks, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from sse_starlette.sse import EventSourceResponse
@@ -30,24 +30,40 @@ app.add_middleware(
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# A queue to hold SSE events to send to connected clients
-sse_queue = asyncio.Queue()
+# A set to hold queues for connected clients
+clients = set()
+
+async def broadcast_notification(message: str):
+    for q in list(clients):
+        await q.put(message)
 
 @app.on_event("startup")
 def startup_event():
     init_db()
 
 @app.get("/api/notifications/stream")
-async def notification_stream():
+async def notification_stream(request: Request):
     """SSE Endpoint for real-time notifications"""
+    client_queue = asyncio.Queue()
+    clients.add(client_queue)
+    
     async def event_generator():
-        while True:
-            # Wait for a new notification event
-            message = await sse_queue.get()
-            yield {
-                "event": "message",
-                "data": message
-            }
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    # Wait for a new notification event with a small timeout to check for disconnects
+                    message = await asyncio.wait_for(client_queue.get(), timeout=1.0)
+                    yield {
+                        "event": "message",
+                        "data": message
+                    }
+                except asyncio.TimeoutError:
+                    pass
+        finally:
+            clients.remove(client_queue)
+            
     return EventSourceResponse(event_generator())
 
 async def process_bulk_uploads(files: List[UploadFile], db: Session):
@@ -90,7 +106,7 @@ async def process_bulk_uploads(files: List[UploadFile], db: Session):
     db.refresh(notif)
     
     # Send SSE to clients
-    await sse_queue.put(notif.message)
+    await broadcast_notification(notif.message)
 
 
 @app.post("/api/upload")
@@ -129,19 +145,31 @@ async def upload_files(background_tasks: BackgroundTasks, files: List[UploadFile
         
         # We simulate the delay in background to show the real-time notification
         async def delayed_notification(count: int):
-            await asyncio.sleep(2)
-            # Add notification
-            db_session = next(get_db())
-            notif = Notification(
-                message=f"{count} files uploaded successfully.",
-                type="success"
-            )
-            db_session.add(notif)
-            db_session.commit()
-            db_session.refresh(notif)
-            # Trigger SSE
-            await sse_queue.put(notif.message)
-            db_session.close()
+            try:
+                await asyncio.sleep(2)
+                # Add notification
+                db_session = next(get_db())
+                notif = Notification(
+                    message=f"{count} files uploaded successfully.",
+                    type="success"
+                )
+                db_session.add(notif)
+                db_session.commit()
+                db_session.refresh(notif)
+                # Trigger SSE
+                await broadcast_notification(notif.message)
+                db_session.close()
+            except Exception as e:
+                db_session = next(get_db())
+                err_notif = Notification(
+                    message=f"Bulk upload failed: system error.",
+                    type="error"
+                )
+                db_session.add(err_notif)
+                db_session.commit()
+                db_session.refresh(err_notif)
+                await broadcast_notification(err_notif.message)
+                db_session.close()
 
         background_tasks.add_task(delayed_notification, len(files))
         return {"status": "processing", "message": f"Upload in progress — processing {len(files)} files in background."}
@@ -149,30 +177,56 @@ async def upload_files(background_tasks: BackgroundTasks, files: List[UploadFile
     else:
         # Synchronous processing for <= 3 files
         results = []
+        success_count = 0
         for file in files:
-            content = await file.read()
-            file_ext = os.path.splitext(file.filename)[1]
-            unique_filename = f"{uuid.uuid4()}{file_ext}"
-            file_path = os.path.join(UPLOAD_DIR, unique_filename)
-            
-            with open(file_path, "wb") as f:
-                f.write(content)
+            try:
+                content = await file.read()
+                file_ext = os.path.splitext(file.filename)[1]
+                unique_filename = f"{uuid.uuid4()}{file_ext}"
+                file_path = os.path.join(UPLOAD_DIR, unique_filename)
                 
-            doc = Document(
-                filename=unique_filename,
-                original_name=file.filename,
-                size=len(content),
-                type=file.content_type or "application/pdf",
-                upload_status="complete"
+                with open(file_path, "wb") as f:
+                    f.write(content)
+                    
+                doc = Document(
+                    filename=unique_filename,
+                    original_name=file.filename,
+                    size=len(content),
+                    type=file.content_type or "application/pdf",
+                    upload_status="complete"
+                )
+                db.add(doc)
+                db.commit()
+                db.refresh(doc)
+                results.append({
+                    "id": doc.id,
+                    "filename": doc.original_name,
+                    "status": "complete"
+                })
+                success_count += 1
+            except Exception as e:
+                # Create an error notification
+                err_notif = Notification(
+                    message=f"Failed to upload {file.filename}.",
+                    type="error"
+                )
+                db.add(err_notif)
+                db.commit()
+                db.refresh(err_notif)
+                await broadcast_notification(err_notif.message)
+            
+        if success_count > 0:
+            # Create notification for successful single/small uploads
+            notif = Notification(
+                message=f"{success_count} file(s) uploaded successfully.",
+                type="success"
             )
-            db.add(doc)
+            db.add(notif)
             db.commit()
-            db.refresh(doc)
-            results.append({
-                "id": doc.id,
-                "filename": doc.original_name,
-                "status": "complete"
-            })
+            db.refresh(notif)
+            
+            # Trigger SSE for connected clients
+            await broadcast_notification(notif.message)
             
         return {"status": "success", "files": results}
 
